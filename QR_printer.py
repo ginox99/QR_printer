@@ -5,6 +5,7 @@ import tempfile
 import win32api
 from PIL import ImageTk, Image
 from tkinter import Toplevel
+from tkinter import ttk
 
 class QRApp:
     def __init__(self, root):
@@ -26,7 +27,7 @@ class QRApp:
         self.setting_button = tk.Button(text="Setting", width=12, font=("Helvetica", 12, "bold"), command=self.setting_window)
         self.setting_button.grid(row=0, column=1, pady=5)
 
-        ########## Penguin Label ##############
+        #************* Penguin Label *************
         # Label for instructions
         self.instructions_label1 = tk.Label(self.root,
                                            text="Generate QR Label for Penguin:",
@@ -61,32 +62,38 @@ class QRApp:
         self.clear_button1 = tk.Button(self.root, text="Clear All", font=("Helvetica", 12), command=self.clear_penguin)
         self.clear_button1.grid(row=3, column=1, pady=5)
 
-        ########## Picard Label ##############
+        #************* Line for separating two text boxes *************
+        self.separator1 = ttk.Separator(self.root, orient='horizontal')
+        self.separator2 = ttk.Separator(self.root, orient='horizontal')
+        self.separator1.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=(5, 5))
+        self.separator2.grid(row=4, column=1, sticky=(tk.W, tk.E), pady=(5, 5))
+
+        #************* Picard Label *************
         # Label for instructions
         self.instructions_label2 = tk.Label(self.root,
                                            text="Generate QR Label for Picard:",
                                            font=("Helvetica", 15, "bold"))
-        self.instructions_label2.grid(row=4, column=0, sticky="w", padx=10, pady=10)
+        self.instructions_label2.grid(row=5, column=0, sticky="w", padx=10, pady=10)
 
         # Label for text area
         self.txt_label2 = tk.Label(self.root, text=self.marker_picard, font=("Helvetica", 15))
-        self.txt_label2.grid(row=5, column=0, sticky="w", padx=10, pady=10)
+        self.txt_label2.grid(row=6, column=0, sticky="w", padx=10, pady=10)
 
         # Text area for QR data input
         self.text_area2 = tk.Text(self.root, height=self.num_picard + 1, width=110, font=("Monaco", 15))
-        self.text_area2.grid(row=5, column=0, padx=10, pady=10)
+        self.text_area2.grid(row=6, column=0, padx=10, pady=10)
 
         # Button for enabling auto clear
         self.toggle_button2 = tk.Button(text="Auto Clear: Off", width=12, font=("Helvetica", 12, "bold"), command=self.toggle_switch2)
-        self.toggle_button2.grid(row=6, column=1, pady=5)
+        self.toggle_button2.grid(row=7, column=1, pady=5)
 
         # Button to Generate and Print QR Code
         self.generate_button2 = tk.Button(self.root, text="Print", width=15, height=5, font=("Helvetica", 12, "bold"), command=lambda: self.generate_qr(self.text_area2))
-        self.generate_button2.grid(row=5, column=1, pady=5)
+        self.generate_button2.grid(row=6, column=1, pady=5)
 
         # Label for counting quantity
         self.count2 = tk.Label(self.root, text=f'Quantity:{self.count_picard}', font=("Helvetica", 18, "bold"))
-        self.count2.grid(row=6, column=0, pady=5)
+        self.count2.grid(row=7, column=0, pady=5)
 
         # Bind KeyRelease and KeyPress events to update line count dynamically
         self.text_area2.bind("<KeyRelease>", lambda event: self.update_line_count(self.text_area2))
@@ -94,7 +101,7 @@ class QRApp:
 
         # Button to Clear Data
         self.clear_button2 = tk.Button(self.root, text="Clear All", font=("Helvetica", 12), command=self.clear_picard)
-        self.clear_button2.grid(row=7, column=1, pady=5)
+        self.clear_button2.grid(row=8, column=1, pady=5)
 
         # Configure grid to expand dynamically when resizing window
         self.root.grid_rowconfigure(1, weight=1)  # Make row 1 resizable

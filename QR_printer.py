@@ -3,9 +3,14 @@ from tkinter import messagebox
 import qrcode
 import tempfile
 import win32api
+import pandas as pd
 from PIL import ImageTk, Image
 from tkinter import Toplevel
 from tkinter import ttk
+import os
+import fnmatch
+from datetime import datetime
+import sys
 
 class QRApp:
     def __init__(self, root):
@@ -22,6 +27,13 @@ class QRApp:
         self.num_picard = 6
         self.marker_penguin = ''
         self.marker_picard = ''
+        self.data_collection = '1'
+        self.penguin_data = []
+        self.picard_data = []
+        self.penguin_file = self.find_latest_file(self.find_files()[0])
+        self.picard_file = self.find_latest_file(self.find_files()[1])
+        self.penguin_pallet_number = ''
+        self.picard_pallet_number = ''
 
         # Button for setting
         self.setting_button = tk.Button(text="Setting", width=12, font=("Helvetica", 12, "bold"), command=self.setting_window)
@@ -30,12 +42,12 @@ class QRApp:
         #************* Penguin Label *************
         # Label for instructions
         self.instructions_label1 = tk.Label(self.root,
-                                           text="Generate QR Label for Penguin:",
-                                           font=("Helvetica", 15, "bold"))
+                                           text=f"Generate QR Label for Penguin Pallet #{self.penguin_pallet_number}:",
+                                           font=("Monaco", 15, "bold"))
         self.instructions_label1.grid(row=0, column=0, sticky="w", padx=10, pady=10)
 
         # Marker for text area
-        self.txt_label1 = tk.Label(self.root, text= self.marker_penguin, font=("Helvetica", 15))
+        self.txt_label1 = tk.Label(self.root, text= self.marker_penguin, font=("Monaco", 15))
         self.txt_label1.grid(row=1, column=0, sticky="w", padx=10, pady=10)
 
         # Text area for QR data input
@@ -51,7 +63,7 @@ class QRApp:
         self.generate_button1.grid(row=1, column=1, pady=5)
 
         # Label for counting quantity
-        self.count1 = tk.Label(self.root, text=f'Quantity:{self.count_penguin}', font=("Helvetica", 18, "bold"))
+        self.count1 = tk.Label(self.root, text=f'Quantity:{self.count_penguin}\n File Path: {self.penguin_file}', font=("Helvetica", 18, "bold"))
         self.count1.grid(row=2, column=0, pady=5)
 
         # Bind KeyRelease and KeyPress events to update line count dynamically
@@ -71,12 +83,12 @@ class QRApp:
         #************* Picard Label *************
         # Label for instructions
         self.instructions_label2 = tk.Label(self.root,
-                                           text="Generate QR Label for Picard:",
-                                           font=("Helvetica", 15, "bold"))
+                                           text=f"Generate QR Label for Picard Pallet #{self.picard_pallet_number}:",
+                                           font=("Monaco", 15, "bold"))
         self.instructions_label2.grid(row=5, column=0, sticky="w", padx=10, pady=10)
 
         # Label for text area
-        self.txt_label2 = tk.Label(self.root, text=self.marker_picard, font=("Helvetica", 15))
+        self.txt_label2 = tk.Label(self.root, text=self.marker_picard, font=("Monaco", 15))
         self.txt_label2.grid(row=6, column=0, sticky="w", padx=10, pady=10)
 
         # Text area for QR data input
@@ -92,7 +104,7 @@ class QRApp:
         self.generate_button2.grid(row=6, column=1, pady=5)
 
         # Label for counting quantity
-        self.count2 = tk.Label(self.root, text=f'Quantity:{self.count_picard}', font=("Helvetica", 18, "bold"))
+        self.count2 = tk.Label(self.root, text=f'Quantity:{self.count_picard}\n File Path: {self.picard_file}', font=("Helvetica", 18, "bold"))
         self.count2.grid(row=7, column=0, pady=5)
 
         # Bind KeyRelease and KeyPress events to update line count dynamically
@@ -145,7 +157,11 @@ class QRApp:
         w2.set(self.num_picard)
         w2.pack()
 
-        tk.Button(new_window, text="Confirm",command=lambda:self.get_setting_value(w1,w2)).pack(padx=10, pady=20)
+        checkbox_var = tk.StringVar(value=self.data_collection)
+        w3 = tk.Checkbutton(new_window,text="Data Collection", variable=checkbox_var)
+        w3.pack(padx=10, pady=10)
+
+        tk.Button(new_window, text="Confirm",command=lambda:self.get_setting_value(w1,w2,checkbox_var)).pack(padx=10, pady=10)
 
     def apply_setting(self):
         self.marker_picard = ''
@@ -161,13 +177,69 @@ class QRApp:
         self.txt_label2.config(text=self.marker_picard)
         self.text_area2.config(height=self.num_picard + 1)
 
-    def get_setting_value(self, w1, w2):
+    def get_setting_value(self, w1, w2, checkbox_var):
         self.num_penguin = w1.get()
         self.num_picard = w2.get()
+        self.data_collection = checkbox_var.get()
         self.apply_setting()
         self.new_window.destroy()
 
-    def generate_qr(self, area):
+    def find_files(self):
+        # List to store matching file paths
+        penguin_dir = []
+        picard_dir = []
+        penguin_pattern = "*-*-* Penguin*.xlsx"
+        picard_pattern = "*-*-* Picard*.xlsx"
+        if getattr(sys, 'frozen', False):
+            # If the application is bundled as an executable (using PyInstaller or similar)
+            directory = os.path.dirname(sys.executable)
+        else:
+            # If running as a script
+            directory = os.path.dirname(os.path.realpath(__file__))
+
+        # Walk through the directory and its subdirectories
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                # Check if the file matches the pattern
+                if fnmatch.fnmatch(file, penguin_pattern):
+                    # Add the full file path to the list
+                    penguin_dir.append(os.path.join(root, file))
+
+                if fnmatch.fnmatch(file, picard_pattern):
+                    picard_dir.append(os.path.join(root, file))
+
+        return penguin_dir, picard_dir
+
+    def find_latest_file(self, directory):
+        date_list = []
+        file_list = []  # To store file paths alongside their dates
+
+        # Process files in the "Picard" directory (you can change this to penguin_dir if needed)
+        for file in directory:
+            basename = os.path.basename(file)
+            date_str = basename.split()[0]  # This assumes the date is the first part of the filename (before space)
+
+            try:
+                # Try to parse the date string to a datetime object
+                date_info = datetime.strptime(date_str, "%m-%d-%y")
+                date_list.append(date_info)
+                file_list.append(file)  # Store corresponding file path
+
+            except ValueError:
+                continue  # Skip files that don't match the expected date format
+
+        if date_list:
+            # Sort the date_list in descending order (latest date first)
+            sorted_dates = sorted(zip(date_list, file_list), reverse=True)
+
+            # Extract the file corresponding to the latest date
+            latest_date, latest_file = sorted_dates[0]
+
+            return latest_file
+        else:
+            return None
+
+    def handle_qr_data(self, area):
         text_area = area
         qr_data = text_area.get("1.0", "end-1c").strip()  # Get all text input
         if not qr_data:
@@ -176,6 +248,7 @@ class QRApp:
 
         formatted_data = qr_data.replace('}{', '}\n{')
         data_list = formatted_data.split('\n')
+
         for item in data_list:
             if len(item) != len(data_list[0]):
                 messagebox.showwarning("Invalid Format", "Inconsistent length.")
@@ -191,6 +264,106 @@ class QRApp:
 
         if text_area == self.text_area2 and len(data_list) != self.num_picard:
             messagebox.showwarning("Invalid Format", "Incorrect number of Picards.")
+            return
+
+        return formatted_data
+
+    def save_to_xlsx(self, area):
+        text_area = area
+        self.penguin_data = []
+        self.picard_data = []
+        penguin_file = self.penguin_file
+        picard_file = self.picard_file
+
+        # Ensure the file exists before reading
+        try:
+            # Read existing data
+            if text_area == self.text_area1:
+                penguin_df_existing = pd.read_excel(penguin_file)
+                self.penguin_pallet_number = int(len(penguin_df_existing.index) / 144) + 1
+                print(f"Successfully loaded penguin data from: {penguin_file}")
+
+            if text_area == self.text_area2:
+                picard_df_existing = pd.read_excel(picard_file)
+                self.picard_pallet_number = int(len(picard_df_existing.index) / 96) + 1
+                print(f"Successfully loaded picard data from: {picard_file}")
+
+        except Exception as e:
+            messagebox.showwarning("Warning", f"Error reading excel file.{e}")
+            return
+
+        # Check the area and handle appropriately
+        if text_area == self.text_area1:
+            formatted_data_penguin = self.handle_qr_data(area)
+            penguin_list = formatted_data_penguin.split('\n')
+
+            # Ensure that formatted_data_penguin is not None before appending
+            if formatted_data_penguin is not None:
+                for i in range(len(penguin_list)):
+                 self.penguin_data.append(penguin_list[i])
+
+                try:
+                    # Convert the new data to a DataFrame
+                    new_penguin_df = pd.DataFrame(self.penguin_data, columns=["QR Data"])
+
+                    # Concatenate the new data with the existing data
+                    penguin_df_combined = pd.concat([penguin_df_existing, new_penguin_df], ignore_index=True)
+
+                    # Find duplicated value
+                    duplicates = penguin_df_combined[penguin_df_combined.duplicated()]
+                    if not duplicates.empty:
+                        messagebox.showwarning("Warning", "Duplicates found when trying to save data.")
+                        return
+                    else:
+                        print("No duplicate entries found.")
+
+                    # Save the combined data to Excel
+                    penguin_df_combined.to_excel(penguin_file, index=False)
+                    print(f"Data successfully saved to: {penguin_file}")
+                except Exception as e:
+                    print(f"Error appending data to Excel: {e}")
+
+        if text_area == self.text_area2:
+            formatted_data_picard = self.handle_qr_data(area)
+            picard_list = formatted_data_picard.split('\n')
+
+            # Ensure that formatted_data_picard is not None before appending
+            if formatted_data_picard is not None:
+                for i in range(len(picard_list)):
+                 self.picard_data.append(picard_list[i])
+
+                try:
+                    # Convert the new data to a DataFrame
+                    new_picard_df = pd.DataFrame(self.picard_data, columns=["QR Data"])
+
+                    # Concatenate the new data with the existing data
+                    picard_df_combined = pd.concat([picard_df_existing, new_picard_df], ignore_index=True)
+                    print(f'df_combined {picard_df_combined}')
+
+                    # Find duplicated value
+                    duplicates = picard_df_combined[picard_df_combined.duplicated()]
+                    print(f'duplicates {duplicates}')
+
+                    if not duplicates.empty:
+                        messagebox.showwarning("Warning", "Duplicates found when trying to save data.")
+                        return
+                    else:
+                        print("No duplicate entries found.")
+
+                    # Save the combined data to Excel
+                    picard_df_combined.to_excel(picard_file, index=False)
+                    print(f"Data successfully saved to: {picard_file}")
+                except Exception as e:
+                    print(f"Error appending data to Excel: {e}")
+
+        self.instructions_label1.config(text=f"Generate QR Label for Penguin Pallet #{self.penguin_pallet_number}:")
+        self.instructions_label2.config(text=f"Generate QR Label for Picard Pallet #{self.picard_pallet_number}:")
+
+    def generate_qr(self, area):
+        text_area = area
+        formatted_data = self.handle_qr_data(area)
+
+        if not formatted_data:
             return
 
         # Generate QR Code
@@ -218,6 +391,12 @@ class QRApp:
         # Automatically print the QR code after generation
         self.print_qr(self.img_for_penguin)
 
+        if self.data_collection == '1' and text_area == self.text_area1:
+            self.save_to_xlsx(area)
+
+        if self.data_collection == '1' and text_area == self.text_area2:
+            self.save_to_xlsx(area)
+
         if self.button_status1 and text_area == self.text_area1:
             self.clear_penguin()
 
@@ -225,7 +404,7 @@ class QRApp:
             self.clear_picard()
 
     def count_num(self, text):
-        # Get the number of lines in the Text widget
+        # Count the element of items in the Text widget
         qr_data = text.get("1.0", "end-1c").strip()  # Get all text input
         if not qr_data:
             return  0

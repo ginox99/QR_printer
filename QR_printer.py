@@ -214,10 +214,10 @@ class QRApp:
         date_list = []
         file_list = []  # To store file paths alongside their dates
 
-        # Process files in the "Picard" directory (you can change this to penguin_dir if needed)
+        # Process files in the local directory
         for file in directory:
             basename = os.path.basename(file)
-            date_str = basename.split()[0]  # This assumes the date is the first part of the filename (before space)
+            date_str = basename.split()[0]  # This assumes the date is the first part of the filename
 
             try:
                 # Try to parse the date string to a datetime object
@@ -226,7 +226,7 @@ class QRApp:
                 file_list.append(file)  # Store corresponding file path
 
             except ValueError:
-                continue  # Skip files that don't match the expected date format
+                continue
 
         if date_list:
             # Sort the date_list in descending order (latest date first)
@@ -280,11 +280,13 @@ class QRApp:
             # Read existing data
             if text_area == self.text_area1:
                 penguin_df_existing = pd.read_excel(penguin_file)
+                penguin_df_existing.columns = ['QR Data']
                 self.penguin_pallet_number = int(len(penguin_df_existing.index) / 144) + 1
                 print(f"Successfully loaded penguin data from: {penguin_file}")
 
             if text_area == self.text_area2:
                 picard_df_existing = pd.read_excel(picard_file)
+                picard_df_existing.columns = ['QR Data']
                 self.picard_pallet_number = int(len(picard_df_existing.index) / 96) + 1
                 print(f"Successfully loaded picard data from: {picard_file}")
 

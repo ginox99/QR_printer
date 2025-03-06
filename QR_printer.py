@@ -11,6 +11,9 @@ import os
 import fnmatch
 from datetime import datetime
 import sys
+import pyautogui
+import time
+
 
 class QRApp:
     def __init__(self, root):
@@ -23,8 +26,10 @@ class QRApp:
         self.button_status2 = False
         self.count_penguin = 0
         self.count_picard = 0
-        self.num_penguin = 12
-        self.num_picard = 6
+        self.num_penguin_box = 12
+        self.num_picard_box = 6
+        self.num_penguin_pallet = 144
+        self.num_picard_pallet = 96
         self.marker_penguin = ''
         self.marker_picard = ''
         self.data_collection = '1'
@@ -51,7 +56,7 @@ class QRApp:
         self.txt_label1.grid(row=1, column=0, sticky="w", padx=10, pady=10)
 
         # Text area for QR data input
-        self.text_area1 = tk.Text(self.root, height=self.num_penguin + 1, width=110, font=("Monaco", 15))
+        self.text_area1 = tk.Text(self.root, height=self.num_penguin_box + 1, width=110, font=("Monaco", 15))
         self.text_area1.grid(row=1, column=0, padx=10, pady=10)
 
         # Button for enabling auto clear
@@ -92,7 +97,7 @@ class QRApp:
         self.txt_label2.grid(row=6, column=0, sticky="w", padx=10, pady=10)
 
         # Text area for QR data input
-        self.text_area2 = tk.Text(self.root, height=self.num_picard + 1, width=110, font=("Monaco", 15))
+        self.text_area2 = tk.Text(self.root, height=self.num_picard_box + 1, width=110, font=("Monaco", 15))
         self.text_area2.grid(row=6, column=0, padx=10, pady=10)
 
         # Button for enabling auto clear
@@ -119,7 +124,7 @@ class QRApp:
         self.root.grid_rowconfigure(1, weight=1)  # Make row 1 resizable
         self.root.grid_columnconfigure(0, weight=1)  # Make column 0 resizable
         self.root.grid_columnconfigure(1, weight=1)  # Make column 1 resizable
-        self.apply_setting()
+        self.resize_textbox()
 
     def setting_window(self):
         # Get main window's position and size
@@ -131,12 +136,11 @@ class QRApp:
         # Create the new Toplevel window
         new_window = Toplevel(self.root)
         new_window.title("Setting")
-        new_window.geometry("250x250")
         self.new_window = new_window
 
         # Get the size of the new window
         window_width = 250  # Width of the new window
-        window_height = 250  # Height of the new window
+        window_height = 350  # Height of the new window
 
         # Calculate the position to center the new window relative to the main window
         position_top = main_window_y + int(main_window_height / 2 - window_height / 2)
@@ -145,43 +149,60 @@ class QRApp:
         # Set the new window position
         new_window.geometry(f"{window_width}x{window_height}+{position_left}+{position_top}")
 
-        # Label and Scale for Penguin
+        # Setup for Num of Penguin per box
         tk.Label(new_window, text="Number of Penguin per Box:").pack()
         w1 = tk.Scale(new_window, from_=1, to=20, orient=tk.HORIZONTAL)
-        w1.set(self.num_penguin)
+        w1.set(self.num_penguin_box)
         w1.pack()
 
-        # Label and Scale for Picard
+        # Setup for Num of Picard per box
         tk.Label(new_window, text="Number of Picard per Box:").pack()
         w2 = tk.Scale(new_window, from_=1, to=20, orient=tk.HORIZONTAL)
-        w2.set(self.num_picard)
+        w2.set(self.num_picard_box)
         w2.pack()
 
+        # Setup for Num of Penguin per pallet
+        tk.Label(new_window, text="Number of Penguin per Pallet:").pack()
+        w3 = tk.Entry(new_window, width=10)
+        w3.insert(0, self.num_penguin_pallet)
+        w3.pack()
+
+        # Setup for Num of Picard per pallet
+        tk.Label(new_window, text="Number of Picard per Pallet:").pack()
+        w4 = tk.Entry(new_window, width=10)
+        w4.insert(0, self.num_picard_pallet)
+        w4.pack()
+
         checkbox_var = tk.StringVar(value=self.data_collection)
-        w3 = tk.Checkbutton(new_window,text="Data Collection", variable=checkbox_var)
-        w3.pack(padx=10, pady=10)
+        w5 = tk.Checkbutton(new_window,text="Data Collection", variable=checkbox_var)
+        w5.pack(padx=10, pady=10)
 
-        tk.Button(new_window, text="Confirm",command=lambda:self.get_setting_value(w1,w2,checkbox_var)).pack(padx=10, pady=10)
+        tk.Button(new_window, text="Confirm",command=lambda:self.apply_setting(w1,w2,w3,w4,checkbox_var)).pack(padx=10, pady=10)
 
-    def apply_setting(self):
+    def resize_textbox(self):
         self.marker_picard = ''
         self.marker_penguin = ''
-        for i in range(1,self.num_penguin + 1):
+        for i in range(1,self.num_penguin_box + 1):
             self.marker_penguin += f'{i}:\n'
 
-        for i in range(1,self.num_picard + 1):
+        for i in range(1,self.num_picard_box + 1):
             self.marker_picard += f'{i}:\n'
 
         self.txt_label1.config(text=self.marker_penguin)
-        self.text_area1.config(height=self.num_penguin + 1)
+        self.text_area1.config(height=self.num_penguin_box + 1)
         self.txt_label2.config(text=self.marker_picard)
-        self.text_area2.config(height=self.num_picard + 1)
+        self.text_area2.config(height=self.num_picard_box + 1)
 
-    def get_setting_value(self, w1, w2, checkbox_var):
-        self.num_penguin = w1.get()
-        self.num_picard = w2.get()
+    def apply_setting(self, w1, w2,w3,w4,checkbox_var):
+        self.num_penguin_box = w1.get()
+        self.num_picard_box = w2.get()
         self.data_collection = checkbox_var.get()
-        self.apply_setting()
+        self.num_penguin_pallet = int(w3.get())
+        self.num_picard_pallet = int(w4.get())
+        self.resize_textbox()
+        if self.data_collection != 1:
+            self.instructions_label1.config(text=f"Generate QR Label for Penguin")
+            self.instructions_label2.config(text=f"Generate QR Label for Picard")
         self.new_window.destroy()
 
     def find_files(self):
@@ -258,11 +279,11 @@ class QRApp:
             messagebox.showwarning("Invalid Format", "Duplicate characters.")
             return
 
-        if text_area == self.text_area1 and len(data_list) != self.num_penguin:
+        if text_area == self.text_area1 and len(data_list) != self.num_penguin_box:
             messagebox.showwarning("Invalid Format", "Incorrect number of Penguins.")
             return
 
-        if text_area == self.text_area2 and len(data_list) != self.num_picard:
+        if text_area == self.text_area2 and len(data_list) != self.num_picard_box:
             messagebox.showwarning("Invalid Format", "Incorrect number of Picards.")
             return
 
@@ -280,14 +301,13 @@ class QRApp:
             # Read existing data
             if text_area == self.text_area1:
                 penguin_df_existing = pd.read_excel(penguin_file)
-                penguin_df_existing.columns = ['QR Data']
-                self.penguin_pallet_number = int(len(penguin_df_existing.index) / 144) + 1
+                self.penguin_pallet_number = int(len(penguin_df_existing.index) / self.num_penguin_pallet) + 1
                 print(f"Successfully loaded penguin data from: {penguin_file}")
+
 
             if text_area == self.text_area2:
                 picard_df_existing = pd.read_excel(picard_file)
-                picard_df_existing.columns = ['QR Data']
-                self.picard_pallet_number = int(len(picard_df_existing.index) / 96) + 1
+                self.picard_pallet_number = int(len(picard_df_existing.index) / self.num_picard_pallet) + 1
                 print(f"Successfully loaded picard data from: {picard_file}")
 
         except Exception as e:
@@ -340,11 +360,9 @@ class QRApp:
 
                     # Concatenate the new data with the existing data
                     picard_df_combined = pd.concat([picard_df_existing, new_picard_df], ignore_index=True)
-                    print(f'df_combined {picard_df_combined}')
 
                     # Find duplicated value
                     duplicates = picard_df_combined[picard_df_combined.duplicated()]
-                    print(f'duplicates {duplicates}')
 
                     if not duplicates.empty:
                         messagebox.showwarning("Warning", "Duplicates found when trying to save data.")
@@ -461,6 +479,8 @@ class QRApp:
 
             # Use the default Windows "print" command to send the image to the printer
             win32api.ShellExecute(0, "print", temp_file_path, None, ".", 0)
+            time.sleep(0.5)  # Delay for 0.5 seconds
+            pyautogui.hotkey('alt', 'f')
 
 
 # Create the main window

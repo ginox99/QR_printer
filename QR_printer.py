@@ -4,7 +4,6 @@ import qrcode
 import tempfile
 import win32api
 import pandas as pd
-from PIL import ImageTk, Image
 from tkinter import Toplevel
 from tkinter import ttk
 import os
@@ -39,6 +38,7 @@ class QRApp:
         self.picard_file = self.find_latest_file(self.find_files()[1])
         self.penguin_pallet_number = ''
         self.picard_pallet_number = ''
+        self.delay_time = 0.5
 
         # Button for setting
         self.setting_button = tk.Button(text="Setting", width=12, font=("Helvetica", 12, "bold"), command=self.setting_window)
@@ -56,7 +56,7 @@ class QRApp:
         self.txt_label1.grid(row=1, column=0, sticky="w", padx=10, pady=10)
 
         # Text area for QR data input
-        self.text_area1 = tk.Text(self.root, height=self.num_penguin_box + 1, width=110, font=("Monaco", 15))
+        self.text_area1 = tk.Text(self.root, height=self.num_penguin_box + 1, width=105, font=("Monaco", 15))
         self.text_area1.grid(row=1, column=0, padx=10, pady=10)
 
         # Button for enabling auto clear
@@ -97,7 +97,7 @@ class QRApp:
         self.txt_label2.grid(row=6, column=0, sticky="w", padx=10, pady=10)
 
         # Text area for QR data input
-        self.text_area2 = tk.Text(self.root, height=self.num_picard_box + 1, width=110, font=("Monaco", 15))
+        self.text_area2 = tk.Text(self.root, height=self.num_picard_box + 1, width=105, font=("Monaco", 15))
         self.text_area2.grid(row=6, column=0, padx=10, pady=10)
 
         # Button for enabling auto clear
@@ -140,7 +140,7 @@ class QRApp:
 
         # Get the size of the new window
         window_width = 250  # Width of the new window
-        window_height = 350  # Height of the new window
+        window_height = 400  # Height of the new window
 
         # Calculate the position to center the new window relative to the main window
         position_top = main_window_y + int(main_window_height / 2 - window_height / 2)
@@ -173,11 +173,18 @@ class QRApp:
         w4.insert(0, self.num_picard_pallet)
         w4.pack()
 
+        # Set up delay time for "Fit to frame" auto uncheck
+        tk.Label(new_window, text="Delay for Auto Uncheck FPTF:").pack()
+        w6 = tk.Entry(new_window, width=10)
+        w6.insert(0, self.delay_time)
+        w6.pack()
+
+        # Check box for data collection
         checkbox_var = tk.StringVar(value=self.data_collection)
         w5 = tk.Checkbutton(new_window,text="Data Collection", variable=checkbox_var)
         w5.pack(padx=10, pady=10)
 
-        tk.Button(new_window, text="Confirm",command=lambda:self.apply_setting(w1,w2,w3,w4,checkbox_var)).pack(padx=10, pady=10)
+        tk.Button(new_window, text="Confirm",command=lambda:self.apply_setting(w1,w2,w3,w4,w6,checkbox_var)).pack(padx=10, pady=10)
 
     def resize_textbox(self):
         self.marker_picard = ''
@@ -193,16 +200,18 @@ class QRApp:
         self.txt_label2.config(text=self.marker_picard)
         self.text_area2.config(height=self.num_picard_box + 1)
 
-    def apply_setting(self, w1, w2,w3,w4,checkbox_var):
+    def apply_setting(self, w1, w2,w3,w4,w6,checkbox_var):
         self.num_penguin_box = w1.get()
         self.num_picard_box = w2.get()
         self.data_collection = checkbox_var.get()
         self.num_penguin_pallet = int(w3.get())
         self.num_picard_pallet = int(w4.get())
+        self.delay_time = float(w6.get())
         self.resize_textbox()
-        if self.data_collection != 1:
-            self.instructions_label1.config(text=f"Generate QR Label for Penguin")
-            self.instructions_label2.config(text=f"Generate QR Label for Picard")
+        if self.data_collection != '1':
+            self.instructions_label1.config(text=f"Generate QR Label for Penguin:")
+            self.instructions_label2.config(text=f"Generate QR Label for Picard:")
+
         self.new_window.destroy()
 
     def find_files(self):
@@ -402,26 +411,25 @@ class QRApp:
         # Resize the image to a fixed size (e.g., 500x500)
         img = img.resize((500, 500))  # Change the size as needed
 
-        # Convert to ImageTk format
-        self.qr_image = ImageTk.PhotoImage(img)
+        if text_area == self.text_area1:
+            self.img_for_penguin = img
+            self.print_qr(self.img_for_penguin)
 
-        # Save the image for printing purposes
-        self.img_for_penguin = img  # Save the original PIL image for printing
+            if self.data_collection == '1':
+                self.save_to_xlsx(area)
 
-        # Automatically print the QR code after generation
-        self.print_qr(self.img_for_penguin)
+            if self.button_status1:
+                self.clear_penguin()
 
-        if self.data_collection == '1' and text_area == self.text_area1:
-            self.save_to_xlsx(area)
+        if text_area == self.text_area2:
+            self.img_for_picard = img
+            self.print_qr(self.img_for_picard)
 
-        if self.data_collection == '1' and text_area == self.text_area2:
-            self.save_to_xlsx(area)
+            if self.data_collection == '1':
+              self.save_to_xlsx(area)
 
-        if self.button_status1 and text_area == self.text_area1:
-            self.clear_penguin()
-
-        if self.button_status2 and text_area == self.text_area2:
-            self.clear_picard()
+            if self.button_status2:
+                self.clear_picard()
 
     def count_num(self, text):
         # Count the element of items in the Text widget
@@ -479,7 +487,7 @@ class QRApp:
 
             # Use the default Windows "print" command to send the image to the printer
             win32api.ShellExecute(0, "print", temp_file_path, None, ".", 0)
-            time.sleep(0.5)  # Delay for 0.5 seconds
+            time.sleep(self.delay_time)  # Delay before uncheck
             pyautogui.hotkey('alt', 'f')
 
 

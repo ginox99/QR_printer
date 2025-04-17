@@ -12,7 +12,11 @@ from datetime import datetime
 import sys
 import pyautogui
 import time
-
+import json
+import re
+import asyncio
+from bleak import BleakScanner
+import threading
 
 class QRApp:
     def __init__(self, root):
@@ -32,6 +36,7 @@ class QRApp:
         self.marker_penguin = ''
         self.marker_picard = ''
         self.data_collection = '1'
+        self.status_check = '1'
         self.penguin_data = []
         self.picard_data = []
         self.penguin_file = self.find_latest_file(self.find_files()[0])
@@ -39,6 +44,7 @@ class QRApp:
         self.penguin_pallet_number = ''
         self.picard_pallet_number = ''
         self.delay_time = 0.5
+        self.penguin_status = None
 
         # Button for setting
         self.setting_button = tk.Button(text="Setting", width=12, font=("Helvetica", 12, "bold"), command=self.setting_window)
@@ -140,7 +146,7 @@ class QRApp:
 
         # Get the size of the new window
         window_width = 250  # Width of the new window
-        window_height = 400  # Height of the new window
+        window_height = 450  # Height of the new window
 
         # Calculate the position to center the new window relative to the main window
         position_top = main_window_y + int(main_window_height / 2 - window_height / 2)
@@ -155,17 +161,17 @@ class QRApp:
         w1.set(self.num_penguin_box)
         w1.pack()
 
-        # Setup for Num of Picard per box
-        tk.Label(new_window, text="Number of Picard per Box:").pack()
-        w2 = tk.Scale(new_window, from_=1, to=20, orient=tk.HORIZONTAL)
-        w2.set(self.num_picard_box)
-        w2.pack()
-
         # Setup for Num of Penguin per pallet
         tk.Label(new_window, text="Number of Penguin per Pallet:").pack()
         w3 = tk.Entry(new_window, width=10)
         w3.insert(0, self.num_penguin_pallet)
         w3.pack()
+
+        # Setup for Num of Picard per box
+        tk.Label(new_window, text="Number of Picard per Box:").pack()
+        w2 = tk.Scale(new_window, from_=1, to=20, orient=tk.HORIZONTAL)
+        w2.set(self.num_picard_box)
+        w2.pack()
 
         # Setup for Num of Picard per pallet
         tk.Label(new_window, text="Number of Picard per Pallet:").pack()
@@ -179,12 +185,17 @@ class QRApp:
         w6.insert(0, self.delay_time)
         w6.pack()
 
-        # Check box for data collection
-        checkbox_var = tk.StringVar(value=self.data_collection)
-        w5 = tk.Checkbutton(new_window,text="Data Collection", variable=checkbox_var)
+        # Check box for Penguin ON/OFF status check
+        checkbox_var2 = tk.StringVar(value=self.status_check)
+        w7 = tk.Checkbutton(new_window,text="Penguin ON/OFF Status Check", variable=checkbox_var2)
+        w7.pack(padx=10, pady=10)
+
+       # Check box for data collection
+        checkbox_var1 = tk.StringVar(value=self.data_collection)
+        w5 = tk.Checkbutton(new_window,text="Data Collection", variable=checkbox_var1)
         w5.pack(padx=10, pady=10)
 
-        tk.Button(new_window, text="Confirm",command=lambda:self.apply_setting(w1,w2,w3,w4,w6,checkbox_var)).pack(padx=10, pady=10)
+        tk.Button(new_window, text="Confirm",command=lambda:self.apply_setting(w1,w2,w3,w4,w6,checkbox_var1, checkbox_var2)).pack(padx=10, pady=10)
 
     def resize_textbox(self):
         self.marker_picard = ''
@@ -200,10 +211,11 @@ class QRApp:
         self.txt_label2.config(text=self.marker_picard)
         self.text_area2.config(height=self.num_picard_box + 1)
 
-    def apply_setting(self, w1, w2,w3,w4,w6,checkbox_var):
+    def apply_setting(self, w1, w2,w3,w4,w6,checkbox_var1,checkbox_var2):
         self.num_penguin_box = w1.get()
         self.num_picard_box = w2.get()
-        self.data_collection = checkbox_var.get()
+        self.data_collection = checkbox_var1.get()
+        self.status_check = checkbox_var2.get()
         self.num_penguin_pallet = int(w3.get())
         self.num_picard_pallet = int(w4.get())
         self.delay_time = float(w6.get())
@@ -411,7 +423,21 @@ class QRApp:
         # Resize the image to a fixed size (e.g., 500x500)
         img = img.resize((500, 500))  # Change the size as needed
 
-        if text_area == self.text_area1:
+        if text_area == self.text_area1 and self.status_check == '1':
+            def after_ble():
+                if self.penguin_status is False:
+                    self.img_for_penguin = img
+                    self.print_qr(self.img_for_penguin)
+
+                    if self.data_collection == '1':
+                        self.save_to_xlsx(area)
+
+                    if self.button_status1:
+                        self.clear_penguin()
+
+            self.awaken_penguin_finder(on_done=after_ble)
+
+        if text_area == self.text_area1 and self.status_check != '1':
             self.img_for_penguin = img
             self.print_qr(self.img_for_penguin)
 
@@ -489,6 +515,81 @@ class QRApp:
             win32api.ShellExecute(0, "print", temp_file_path, None, ".", 0)
             time.sleep(self.delay_time)  # Delay before uncheck
             pyautogui.hotkey('alt', 'f')
+
+    def show_auto_message(self, text="Notice", duration=2000):
+        popup = tk.Toplevel(self.root)
+        popup.title("Penguin ON/OFF Status:")
+        popup.resizable(False, False)
+        popup.attributes("-topmost", True)
+        popup.configure(bg="white")
+
+        # Set size
+        width, height = 300, 100
+        popup.geometry(f"{width}x{height}")
+
+        # Center the popup relative to the main window
+        self.root.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (width // 2)
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (height // 2)
+        popup.geometry(f"+{x}+{y}")
+
+        # Add content
+        label = tk.Label(popup, text=text, font=("Helvetica", 12), bg="white")
+        label.pack(expand=True)
+
+        # Auto-close
+        popup.after(duration, popup.destroy)
+
+    def awaken_penguin_finder(self, on_done=None):
+        json_list = self.handle_qr_data(self.text_area1).split('\n')
+
+        def validate_mac(mac):
+            return re.match(r'^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$', mac) is not None
+
+        def extract_mac():
+            mac_list = []
+            try:
+                for obj_str in json_list:
+                    parsed_obj = json.loads(obj_str)
+                    raw_mac = parsed_obj.get('mac', '')
+                    formatted_mac = ':'.join(raw_mac[i:i + 2] for i in range(0, len(raw_mac), 2))
+                    if validate_mac(formatted_mac):
+                        mac_list.append(formatted_mac)
+            except Exception as e:
+                print(f'Error extracting MACs: {e}')
+            return mac_list
+
+        batteries_list = extract_mac()
+        device_list = []
+
+        async def scan_ble():
+            try:
+                self.show_auto_message('Started checking batteries status....')
+                devices = await BleakScanner.discover()
+                for device in devices:
+                    device_list.append(device.address)
+            except Exception as e:
+                print(f"BLE Scan Error: {e}")
+            finally:
+                find_awaken_battery()
+                if on_done:
+                    self.root.after(0, on_done)  # Call the callback on the main thread
+
+        def find_awaken_battery():
+            duplicates = set(batteries_list).intersection(set(device_list))
+            print(batteries_list)
+            print(device_list)
+            if duplicates:
+                messagebox.showwarning('Penguin ON/OFF Status:', f'Awaken battery found:\n {duplicates}')
+                self.penguin_status = True
+            else:
+                messagebox.showinfo('Penguin ON/OFF Status:', 'No awaken battery found.')
+                self.penguin_status = False
+
+        def run_ble_scan():
+            asyncio.run(scan_ble())
+
+        threading.Thread(target=run_ble_scan).start()
 
 
 # Create the main window
